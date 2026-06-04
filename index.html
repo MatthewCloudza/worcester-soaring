@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worcester Soaring Forecast - Cape Gliding Club</title>
+    <meta name="description" content="AI-powered soaring weather forecast for Worcester / Cape Gliding Club">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --color-bg: #0f172a;
+            --color-bg-secondary: #1e293b;
+            --color-surface: #334155;
+            --color-text: #f1f5f9;
+            --color-text-secondary: #94a3b8;
+            --color-text-muted: #64748b;
+            --color-border: #334155;
+            --color-border-light: #1e293b;
+            --color-primary: #3b82f6;
+            --color-primary-light: #1d4ed8;
+            --color-success: #22c55e;
+            --color-success-bg: rgba(34,197,94,0.1);
+            --color-warning: #f59e0b;
+            --color-warning-bg: rgba(245,158,11,0.1);
+            --color-error: #ef4444;
+            --color-error-bg: rgba(239,68,68,0.1);
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'SF Mono', Consolas, monospace;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--color-bg);
+            color: var(--color-text);
+            font-family: var(--font-sans);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container { max-width: 800px; margin: 0 auto; }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 24px 0 16px;
+            border-bottom: 1px solid var(--color-border);
+            margin-bottom: 24px;
+        }
+        .header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .header .subtitle { color: var(--color-text-secondary); font-size: 13px; }
+        .header .update-time {
+            color: var(--color-text-muted); font-size: 11px;
+            margin-top: 8px; font-family: var(--font-mono);
+        }
+
+        /* Status */
+        .status-msg { text-align: center; padding: 48px 16px; color: var(--color-text-secondary); }
+        .status-msg i { font-size: 32px; margin-bottom: 12px; display: block; }
+        .status-msg.error i { color: var(--color-error); }
+
+        /* Day tabs */
+        .day-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+        .day-tab {
+            flex: 1; padding: 10px 12px;
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            cursor: pointer; text-align: center;
+            transition: all 0.15s ease;
+            font-size: 13px; color: var(--color-text-secondary);
+        }
+        .day-tab:hover { border-color: var(--color-primary); }
+        .day-tab.active {
+            background: var(--color-primary-light);
+            border-color: var(--color-primary);
+            color: var(--color-text); font-weight: 600;
+        }
+        .day-tab .day-name { display: block; font-weight: 600; font-size: 14px; }
+        .day-tab .day-date { font-size: 11px; color: var(--color-text-muted); }
+        .day-tab.active .day-date { color: var(--color-text-secondary); }
+
+        /* Flyability Score */
+        .fly-score {
+            display: flex; align-items: center; justify-content: center;
+            gap: 16px; margin-bottom: 16px; padding: 20px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--color-border);
+            background: var(--color-bg-secondary);
+        }
+        .fly-score-ring {
+            position: relative; width: 80px; height: 80px;
+        }
+        .fly-score-ring svg { transform: rotate(-90deg); }
+        .fly-score-ring .score-num {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; font-weight: 800; font-family: var(--font-mono);
+        }
+        .fly-score-info { text-align: left; }
+        .fly-score-label { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+        .fly-score-desc { font-size: 13px; color: var(--color-text-secondary); max-width: 200px; }
+
+        /* Quick summary */
+        .quick-summary {
+            border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; border: 1px solid;
+        }
+        .quick-summary.good { background: var(--color-success-bg); border-color: var(--color-success); }
+        .quick-summary.marginal { background: var(--color-warning-bg); border-color: var(--color-warning); }
+        .quick-summary.poor { background: var(--color-error-bg); border-color: var(--color-error); }
+        .quick-summary .qs-body { font-size: 14px; line-height: 1.6; }
+        .quick-summary .qs-body p { margin-bottom: 6px; }
+        .quick-summary .qs-body p:last-child { margin-bottom: 0; }
+
+        /* Best window timeline */
+        .timeline-card {
+            background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px;
+        }
+        .timeline-bar-wrap { margin-top: 12px; }
+        .timeline-labels {
+            display: flex; justify-content: space-between;
+            font-size: 10px; color: var(--color-text-muted); font-family: var(--font-mono);
+            margin-bottom: 4px;
+        }
+        .timeline-bar {
+            height: 24px; background: var(--color-surface); border-radius: 12px;
+            position: relative; overflow: hidden;
+        }
+        .timeline-fill {
+            position: absolute; top: 0; bottom: 0;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 600; color: #fff;
+        }
+        .timeline-fill.thermal { background: linear-gradient(90deg, #f59e0b, #22c55e, #f59e0b); }
+        .timeline-fill.ridge { background: linear-gradient(90deg, var(--color-primary), var(--color-primary-light)); }
+        .timeline-legend {
+            display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--color-text-secondary);
+        }
+        .timeline-legend span::before {
+            content: ''; display: inline-block; width: 8px; height: 8px;
+            border-radius: 50%; margin-right: 4px; vertical-align: middle;
+        }
+        .timeline-legend .leg-thermal::before { background: var(--color-success); }
+        .timeline-legend .leg-ridge::before { background: var(--color-primary); }
+
+        /* Cards */
+        .card {
+            background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px;
+        }
+        .card-title {
+            font-size: 12px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--color-text-muted);
+            margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+        }
+        .card-title i { font-size: 14px; }
+
+        /* Verdict table */
+        .verdict-table { width: 100%; border-collapse: collapse; }
+        .verdict-table td { padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
+        .verdict-table tr:last-child td { border-bottom: none; }
+        .verdict-table .factor { color: var(--color-text-secondary); width: 40%; }
+        .verdict-table .rating { font-weight: 600; }
+        .verdict-table .detail { color: var(--color-text-secondary); font-size: 12px; }
+        .rating-good { color: var(--color-success); }
+        .rating-marginal { color: var(--color-warning); }
+        .rating-poor { color: var(--color-error); }
+
+        /* Data rows */
+        .data-row {
+            display: flex; justify-content: space-between; align-items: baseline;
+            padding: 6px 0; border-bottom: 1px solid var(--color-border); font-size: 13px;
+        }
+        .data-row:last-child { border-bottom: none; }
+        .data-row .label { color: var(--color-text-secondary); }
+        .data-row .value { font-family: var(--font-mono); font-weight: 500; }
+        .data-row .plain { font-family: var(--font-sans); font-size: 12px; color: var(--color-text-secondary); font-style: italic; }
+
+        /* Recommendation */
+        .recommendation {
+            background: linear-gradient(135deg, var(--color-primary-light), var(--color-bg-secondary));
+            border: 1px solid var(--color-primary); border-radius: var(--radius-lg);
+            padding: 16px; margin-bottom: 12px; font-size: 14px; line-height: 1.6;
+        }
+
+        /* Share button */
+        .share-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--color-surface); border: 1px solid var(--color-border);
+            border-radius: var(--radius-md); padding: 8px 14px;
+            color: var(--color-text-secondary); font-size: 12px;
+            cursor: pointer; transition: all 0.15s; margin-top: 8px;
+        }
+        .share-btn:hover { border-color: var(--color-primary); color: var(--color-text); }
+        .share-btn.copied { border-color: var(--color-success); color: var(--color-success); }
+
+        /* Soundings */
+        .soundings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .sounding-img {
+            width: 100%; border-radius: var(--radius-sm); background: #fff;
+            cursor: pointer; transition: transform 0.15s ease;
+        }
+        .sounding-img:hover { transform: scale(1.02); }
+        .sounding-label { text-align: center; font-size: 11px; color: var(--color-text-muted); margin-top: 4px; }
+
+        /* Lightbox */
+        .lightbox {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.9); z-index: 1000;
+            align-items: center; justify-content: center; padding: 16px; cursor: pointer;
+        }
+        .lightbox.open { display: flex; }
+        .lightbox img { max-width: 100%; max-height: 90vh; border-radius: var(--radius-md); }
+
+        /* Learning section */
+        .learn-section { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--color-border); }
+        .learn-section h2 { font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .learn-item {
+            background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg); margin-bottom: 8px; overflow: hidden;
+        }
+        .learn-header {
+            padding: 12px 16px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 14px; font-weight: 500; transition: background 0.15s;
+        }
+        .learn-header:hover { background: var(--color-surface); }
+        .learn-header i { transition: transform 0.2s; color: var(--color-text-muted); }
+        .learn-item.open .learn-header i { transform: rotate(180deg); }
+        .learn-body {
+            display: none; padding: 0 16px 16px;
+            font-size: 13px; line-height: 1.7; color: var(--color-text-secondary);
+        }
+        .learn-item.open .learn-body { display: block; }
+        .learn-body p { margin-bottom: 8px; }
+        .learn-body .example {
+            background: var(--color-surface); border-radius: var(--radius-sm);
+            padding: 8px 12px; margin: 8px 0; font-family: var(--font-mono); font-size: 12px;
+        }
+        .learn-body strong { color: var(--color-text); }
+
+        /* Footer */
+        .footer {
+            text-align: center; padding: 24px 0;
+            color: var(--color-text-muted); font-size: 11px;
+            border-top: 1px solid var(--color-border); margin-top: 24px;
+        }
+        .footer a { color: var(--color-primary); text-decoration: none; }
+
+        /* Install banner */
+        .install-banner {
+            display: none; position: fixed; bottom: 16px; left: 16px; right: 16px;
+            background: var(--color-bg-secondary); border: 1px solid var(--color-primary);
+            border-radius: var(--radius-lg); padding: 12px 16px;
+            z-index: 900; max-width: 400px; margin: 0 auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .install-banner.show { display: flex; align-items: center; gap: 12px; }
+        .install-banner .ib-text { flex: 1; font-size: 13px; }
+        .install-banner .ib-text strong { display: block; font-size: 14px; }
+        .install-banner button {
+            background: var(--color-primary); color: #fff; border: none;
+            border-radius: var(--radius-md); padding: 8px 16px;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+        .install-banner .ib-close {
+            background: none; color: var(--color-text-muted); padding: 4px;
+            font-size: 18px; cursor: pointer; border: none;
+        }
+
+        @media (max-width: 480px) {
+            .soundings-grid { grid-template-columns: 1fr; }
+            body { padding: 8px; }
+            .fly-score { padding: 16px; gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fa-solid fa-cloud-sun"></i> Worcester Soaring Forecast</h1>
+            <div class="subtitle">Cape Gliding Club (FAWO)</div>
+            <div class="update-time" id="update-time">Loading forecast...</div>
+        </header>
+
+        <div id="content">
+            <div class="status-msg">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                <p>Fetching latest forecast data...</p>
+            </div>
+        </div>
+
+        <!-- Learning Section -->
+        <div class="learn-section">
+            <h2><i class="fa-solid fa-graduation-cap"></i> Learn: Reading the Forecast</h2>
+
+            <div class="learn-item">
+                <div class="learn-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span>What is CAPE?</span><i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="learn-body">
+                    <p><strong>CAPE (Convective Available Potential Energy)</strong> measures how much energy is available for thermals. Think of it as "thermal fuel".</p>
+                    <p>Higher CAPE = stronger thermals that go higher.</p>
+                    <div class="example">0-100 J/kg = No useful thermals (stay home)<br>100-500 = Weak thermals (local flying only)<br>500-1000 = Moderate (good soaring day)<br>1000+ = Strong (XC potential, but watch for overdevelopment)</div>
+                    <p>At Worcester, a "good" winter day might only show 200-400 J/kg. In summer, 800+ is common.</p>
+                </div>
+            </div>
+
+            <div class="learn-item">
+                <div class="learn-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span>What is the Showalter Index?</span><i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="learn-body">
+                    <p><strong>Showalter Index</strong> measures atmospheric stability. It's the temperature difference between a lifted parcel and its environment at 500 hPa.</p>
+                    <p><strong>Negative = unstable = good for thermals.</strong> Positive = stable = thermals capped.</p>
+                    <div class="example">Below 0 = Unstable (thermals likely)<br>0 to 3 = Marginal (weak thermals possible)<br>3 to 6 = Stable (thermals unlikely)<br>Above 6 = Very stable (no chance)</div>
+                    <p>At Worcester, anything below 3 in winter is actually worth looking at.</p>
+                </div>
+            </div>
+
+            <div class="learn-item">
+                <div class="learn-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span>What is the LCL (Cloudbase)?</span><i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="learn-body">
+                    <p><strong>LCL (Lifted Condensation Level)</strong> is where clouds form. For pilots, this is your <strong>expected cloudbase</strong>.</p>
+                    <div class="example">Below 3000 ft AGL = Low cloudbase (limited height)<br>3000-5000 ft = Moderate (decent local soaring)<br>5000-8000 ft = Good (XC conditions)<br>Above 8000 ft = High but may be blue (no cu)</div>
+                    <p>Very high LCL (7000+ ft) can mean "blue" thermals with no cloud marking.</p>
+                </div>
+            </div>
+
+            <div class="learn-item">
+                <div class="learn-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span>Lapse Rate & Inversions</span><i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="learn-body">
+                    <p><strong>Lapse Rate</strong> is how quickly temperature drops with altitude. Faster cooling = more unstable = better thermals.</p>
+                    <div class="example">Stable = Thermals die quickly<br>Marginal = Weak, broken thermals<br>Unstable = Strong, continuous thermals</div>
+                    <p><strong>Inversions</strong> are layers where temperature increases with height. Thermals cannot punch through them. They act like a lid on your altitude.</p>
+                </div>
+            </div>
+
+            <div class="learn-item">
+                <div class="learn-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span>Ridge Soaring at Worcester</span><i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="learn-body">
+                    <p><strong>Ridge lift</strong> forms when wind hits a mountain slope and deflects upward. No thermals needed.</p>
+                    <div class="example">Slanghoek: Needs NW wind (15+ kt at 850 hPa)<br>Du Toitskloof: Needs W to NW wind<br>Hex River: Needs S to SW wind</div>
+                    <p><strong>Minimum wind:</strong> 15 kt at ridge height. Below 12 kt is usually too weak. Ridge soaring works year-round, even on winter cold-front days.</p>
+                </div>
+            </div>
+
+            <div class="learn-item">
+                <div class="learn-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span>Wave Soaring</span><i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="learn-body">
+                    <p><strong>Wave lift</strong> forms downwind of mountains when stable air flows over them. Like water flowing over a rock.</p>
+                    <div class="example">Needs: 20+ kt wind perpendicular to ridge<br>Wind increasing with altitude<br>Stable layer near mountain-top height<br>Signs: lenticular clouds, rotor turbulence</div>
+                    <p>At Worcester, NW flow across the Boland mountains produces wave. Entry is usually via ridge lift.</p>
+                </div>
+            </div>
+
+            <div class="learn-item">
+                <div class="learn-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span>Cu Marking vs Blue Days</span><i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="learn-body">
+                    <p><strong>Cu (cumulus) clouds</strong> mark thermal tops. They're signposts showing where lift is.</p>
+                    <p><strong>Blue days</strong> have thermals but no clouds (too dry). You find lift by feel, terrain, and experience.</p>
+                    <div class="example">Cu-marked = Easier (fly toward developing cu)<br>Blue = Harder (use terrain triggers)<br>Spreadout/OD = Too much cu, sky fills in, kills thermals</div>
+                </div>
+            </div>
+
+            <div class="learn-item">
+                <div class="learn-header" onclick="this.parentElement.classList.toggle('open')">
+                    <span>Reading the RASP Sounding</span><i class="fa-solid fa-chevron-down"></i>
+                </div>
+                <div class="learn-body">
+                    <p>The sounding (tephigram) shows the atmosphere's vertical profile:</p>
+                    <div class="example">Red line (right) = Temperature<br>Blue/green line (left) = Dewpoint<br>Gap between them = How dry the air is<br>Where they meet = Cloud forms (LCL)<br>Wind barbs (right side) = Wind at each level</div>
+                    <p><strong>Look for:</strong> Temp line leaning left steeply (unstable/good), lines close together (moisture/cu), kinks (inversions/caps), wind increasing with height (wave potential).</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Data from <a href="https://rasp.org.za" target="_blank">RASP South Africa</a> | AI-analyzed soundings</p>
+            <p style="margin-top:4px;">Updates Thu/Fri/Sat at 19:00 SAST</p>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="this.classList.remove('open')">
+        <img id="lightbox-img" src="" alt="Sounding">
+    </div>
+
+    <!-- Install banner -->
+    <div class="install-banner" id="install-banner">
+        <div class="ib-text">
+            <strong>Install App</strong>
+            Add to home screen for quick access
+        </div>
+        <button onclick="installApp()">Install</button>
+        <button class="ib-close" onclick="dismissInstall()">×</button>
+    </div>
+
+    <script>
+    // === RASP URLs ===
+    function getSoundingUrl(day, time) {
+        const dayPath = day === 'd1' ? 'rasp-hd-d1' : 'rasp-hd-d2';
+        return `https://rasp.org.za/${dayPath}/FCST/sounding1.curr.${time}lst.w2.png`;
+    }
+
+    // === FLYABILITY SCORE (1-10) ===
+    function calcFlyScore(verdict) {
+        const weights = {
+            thermal_strength: 3,
+            thermal_height: 2,
+            cu_marking: 1,
+            wind_ridge: 3,
+            spreadout: 1
+        };
+        const ratingVal = { good: 10, marginal: 5, poor: 1 };
+        let totalWeight = 0, totalScore = 0;
+        for (const [key, weight] of Object.entries(weights)) {
+            if (verdict[key]) {
+                totalScore += ratingVal[verdict[key].rating] * weight;
+                totalWeight += weight;
+            }
+        }
+        return totalWeight > 0 ? Math.round(totalScore / totalWeight) : 0;
+    }
+
+    function getScoreColor(score) {
+        if (score >= 7) return '#22c55e';
+        if (score >= 4) return '#f59e0b';
+        return '#ef4444';
+    }
+
+    function getScoreLabel(score) {
+        if (score >= 8) return 'Excellent';
+        if (score >= 7) return 'Good Day';
+        if (score >= 5) return 'Flyable';
+        if (score >= 4) return 'Marginal';
+        if (score >= 2) return 'Poor';
+        return 'No Go';
+    }
+
+    function getScoreDesc(score, verdict) {
+        if (score >= 7) return 'Conditions support soaring. Get out there!';
+        if (score >= 5) return 'Some lift available. Experienced pilots can make it work.';
+        if (score >= 4) return 'Borderline. Ridge may work if wind cooperates.';
+        return 'Not worth rigging. Save it for a better day.';
+    }
+
+    function renderScoreRing(score) {
+        const color = getScoreColor(score);
+        const pct = score / 10;
+        const circumference = 2 * Math.PI * 34;
+        const dashLen = circumference * pct;
+        return `<div class="fly-score-ring">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="34" fill="none" stroke="var(--color-surface)" stroke-width="6"/>
+                <circle cx="40" cy="40" r="34" fill="none" stroke="${color}" stroke-width="6"
+                    stroke-dasharray="${dashLen} ${circumference}" stroke-linecap="round"/>
+            </svg>
+            <div class="score-num" style="color:${color}">${score}</div>
+        </div>`;
+    }
+
+    // === BEST WINDOW TIMELINE ===
+    function renderTimeline(assessment) {
+        const v = assessment.verdict;
+        const hasTherm = v.thermal_strength.rating !== 'poor';
+        const hasRidge = v.wind_ridge.rating !== 'poor';
+
+        if (!hasTherm && !hasRidge) {
+            return ''; // No timeline if nothing flyable
+        }
+
+        let bars = '';
+        // Thermal window (typically 11:00-15:00 in the Western Cape)
+        if (hasTherm) {
+            const startPct = ((11 - 7) / 12) * 100; // 7am-19pm range
+            const widthPct = ((15 - 11) / 12) * 100;
+            bars += `<div class="timeline-fill thermal" style="left:${startPct}%;width:${widthPct}%">thermals</div>`;
+        }
+        // Ridge window (wider, as long as wind holds)
+        if (hasRidge) {
+            const startPct = ((9 - 7) / 12) * 100;
+            const widthPct = ((16 - 9) / 12) * 100;
+            bars += `<div class="timeline-fill ridge" style="left:${startPct}%;width:${widthPct}%;opacity:0.6;top:0;height:100%">ridge</div>`;
+        }
+
+        let legend = '<div class="timeline-legend">';
+        if (hasTherm) legend += '<span class="leg-thermal">Thermals (11:00-15:00)</span>';
+        if (hasRidge) legend += '<span class="leg-ridge">Ridge (09:00-16:00)</span>';
+        legend += '</div>';
+
+        return `<div class="timeline-card">
+            <div class="card-title"><i class="fa-solid fa-clock"></i> Best Flying Window</div>
+            <div class="timeline-bar-wrap">
+                <div class="timeline-labels">
+                    <span>07:00</span><span>10:00</span><span>13:00</span><span>16:00</span><span>19:00</span>
+                </div>
+                <div class="timeline-bar">${bars}</div>
+                ${legend}
+            </div>
+        </div>`;
+    }
+
+    // === PLAIN ENGLISH SUMMARY ===
+    function getOverallRating(verdict) {
+        const ratings = Object.values(verdict).filter(v => v).map(v => v.rating);
+        const good = ratings.filter(r => r === 'good').length;
+        const poor = ratings.filter(r => r === 'poor').length;
+        if (poor >= 3) return 'poor';
+        if (good >= 3) return 'good';
+        return 'marginal';
+    }
+
+    function getPlainSummary(assessment) {
+        const overall = getOverallRating(assessment.verdict);
+        const v = assessment.verdict;
+        let lines = [];
+
+        if (v.thermal_strength.rating === 'good') {
+            lines.push('<p>☀️ Good thermal energy. Expect usable lift.</p>');
+        } else if (v.thermal_strength.rating === 'marginal') {
+            lines.push('<p>🌤️ Weak thermals. Light, broken lift possible.</p>');
+        } else {
+            lines.push('<p>❌ No useful thermal activity expected.</p>');
+        }
+
+        if (v.wind_ridge.rating === 'good') {
+            lines.push('<p>🏔️ Wind is good for ridge soaring.</p>');
+        } else if (v.wind_ridge.rating === 'marginal') {
+            lines.push('<p>💨 Marginal wind for ridge. Might work, might not.</p>');
+        }
+
+        if (v.cu_marking.rating === 'good') {
+            lines.push('<p>☁️ Cu markers expected (easier to find lift).</p>');
+        } else if (v.cu_marking.rating === 'poor' && v.thermal_strength.rating !== 'poor') {
+            lines.push('<p>🔵 Blue day. Thermals harder to spot without clouds.</p>');
+        }
+
+        if (v.spreadout && v.spreadout.rating === 'poor') {
+            lines.push('<p>⚠️ Risk of overdevelopment later in the day.</p>');
+        }
+
+        return { overall, html: lines.join('') };
+    }
+
+    // === SHARE ===
+    function shareDay(dayName, score, recommendation) {
+        const emoji = score >= 7 ? '✅' : score >= 4 ? '⚠️' : '🚫';
+        const label = getScoreLabel(score);
+        const short = recommendation.length > 100 ? recommendation.substring(0, 100) + '...' : recommendation;
+        const text = `${emoji} Worcester ${dayName}: ${label} (${score}/10). ${short}`;
+
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = document.querySelector('.share-btn.active-share');
+            if (btn) { btn.classList.add('copied'); btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!'; }
+            setTimeout(() => {
+                if (btn) { btn.classList.remove('copied'); btn.innerHTML = '<i class="fa-solid fa-share-nodes"></i> Share to WhatsApp'; }
+            }, 2000);
+        });
+    }
+
+    // === LOAD FORECAST ===
+    async function loadForecast() {
+        try {
+            await new Promise((resolve, reject) => {
+                const existing = document.getElementById('forecast-script');
+                if (existing) existing.remove();
+                window.FORECAST_DATA = null;
+                const script = document.createElement('script');
+                script.id = 'forecast-script';
+                script.src = `forecast.js?_t=${Date.now()}`;
+                script.onload = resolve;
+                script.onerror = () => reject(new Error('Failed to load forecast data'));
+                document.head.appendChild(script);
+            });
+
+            if (!window.FORECAST_DATA) throw new Error('Forecast data not found');
+            const data = window.FORECAST_DATA;
+
+            if (data.days) {
+                renderForecast(data);
+            } else if (data.saturday || data.sunday) {
+                renderLegacyForecast(data);
+            } else {
+                throw new Error('Unrecognized forecast format');
+            }
+        } catch (err) {
+            document.getElementById('content').innerHTML = `
+                <div class="status-msg error">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <p>Could not load forecast data</p>
+                    <p style="font-size:12px;margin-top:8px;">${err.message}</p>
+                    <p style="font-size:11px;margin-top:12px;color:var(--color-text-muted);">
+                        Forecasts are published Thu/Fri/Sat evenings.
+                    </p>
+                </div>`;
+        }
+    }
+
+    function renderForecast(data) {
+        const days = data.days || [];
+        if (days.length === 0) return;
+
+        const genTime = new Date(data.generated_at);
+        document.getElementById('update-time').textContent =
+            `Updated: ${genTime.toLocaleDateString('en-ZA', {weekday:'short', day:'numeric', month:'short'})} at ${genTime.toLocaleTimeString('en-ZA', {hour:'2-digit', minute:'2-digit'})}`;
+
+        let html = '';
+
+        // Day tabs
+        html += '<div class="day-tabs">';
+        days.forEach((day, i) => {
+            const d = new Date(day.date + 'T12:00:00');
+            const dayName = day.day_name || d.toLocaleDateString('en-ZA', {weekday:'long'});
+            const dateStr = d.toLocaleDateString('en-ZA', {day:'numeric', month:'short'});
+            html += `<div class="day-tab ${i===0?'active':''}" onclick="switchDay(${i})">
+                <span class="day-name">${dayName}</span>
+                <span class="day-date">${dateStr}</span>
+            </div>`;
+        });
+        html += '</div>';
+
+        // Day content
+        days.forEach((day, i) => {
+            const a = day.assessment;
+            const summary = getPlainSummary(a);
+            const score = calcFlyScore(a.verdict);
+            const d = new Date(day.date + 'T12:00:00');
+            const dayName = day.day_name || d.toLocaleDateString('en-ZA', {weekday:'long'});
+
+            html += `<div class="day-content" id="day-${i}" style="${i>0?'display:none':''}">`;
+
+            // Flyability score
+            html += `<div class="fly-score">
+                ${renderScoreRing(score)}
+                <div class="fly-score-info">
+                    <div class="fly-score-label" style="color:${getScoreColor(score)}">${getScoreLabel(score)}</div>
+                    <div class="fly-score-desc">${getScoreDesc(score, a.verdict)}</div>
+                </div>
+            </div>`;
+
+            // Plain summary
+            html += `<div class="quick-summary ${summary.overall}">
+                <div class="qs-body">${summary.html}</div>
+            </div>`;
+
+            // Best window timeline
+            html += renderTimeline(a);
+
+            // Recommendation + share
+            html += `<div class="recommendation">
+                <div class="card-title"><i class="fa-solid fa-bullseye"></i> Full Recommendation</div>
+                ${a.recommendation}
+                <br><button class="share-btn active-share" onclick="shareDay('${dayName}', ${score}, \`${a.recommendation.replace(/`/g, "'")}\`)">
+                    <i class="fa-solid fa-share-nodes"></i> Share to WhatsApp
+                </button>
+            </div>`;
+
+            // Verdict
+            html += `<div class="card">
+                <div class="card-title"><i class="fa-solid fa-gauge-high"></i> Verdict</div>
+                <table class="verdict-table">
+                    ${renderVerdictRow('Thermal Strength', a.verdict.thermal_strength)}
+                    ${renderVerdictRow('Thermal Height', a.verdict.thermal_height)}
+                    ${renderVerdictRow('Cu Marking', a.verdict.cu_marking)}
+                    ${renderVerdictRow('Wind / Ridge', a.verdict.wind_ridge)}
+                    ${renderVerdictRow('Spreadout / OD', a.verdict.spreadout)}
+                </table>
+            </div>`;
+
+            // Thermals
+            html += `<div class="card">
+                <div class="card-title"><i class="fa-solid fa-temperature-arrow-up"></i> Thermals</div>
+                <div class="data-row"><span class="label">CAPE</span><span class="value">${a.cape.value} J/kg</span></div>
+                <div class="data-row"><span class="label"></span><span class="plain">${a.cape.interpretation}</span></div>
+                <div class="data-row"><span class="label">Showalter Index</span><span class="value">${a.showalter.value}</span></div>
+                <div class="data-row"><span class="label"></span><span class="plain">${a.showalter.interpretation}</span></div>
+                <div class="data-row"><span class="label">Cloudbase (LCL)</span><span class="value">${a.lcl_ft} ft AGL</span></div>
+                <div class="data-row"><span class="label">Lapse Rate</span><span class="value rating-${a.lapse_rate === 'unstable' ? 'good' : a.lapse_rate === 'marginal' ? 'marginal' : 'poor'}">${a.lapse_rate}</span></div>
+                <div class="data-row"><span class="label"></span><span class="plain">${a.lapse_detail}</span></div>
+            </div>`;
+
+            // Wind
+            html += `<div class="card">
+                <div class="card-title"><i class="fa-solid fa-wind"></i> Wind / Ridge / Wave</div>
+                <div class="data-row"><span class="label">Surface</span><span class="value">${a.surface_wind}</span></div>
+                <div class="data-row"><span class="label">850 hPa (~5000ft)</span><span class="value">${a.wind_850}</span></div>
+                <div class="data-row"><span class="label">700 hPa (~10000ft)</span><span class="value">${a.wind_700}</span></div>
+                <div class="data-row"><span class="label">Ridge Potential</span><span class="plain">${a.ridge_potential}</span></div>
+                <div class="data-row"><span class="label">Wave Potential</span><span class="plain">${a.wave_potential}</span></div>
+            </div>`;
+
+            // Moisture
+            html += `<div class="card">
+                <div class="card-title"><i class="fa-solid fa-droplet"></i> Moisture & Cloud</div>
+                <div class="data-row"><span class="label">Precipitable Water</span><span class="value">${a.pwat} cm</span></div>
+                <div class="data-row"><span class="label">Cloud Water</span><span class="value">${a.cloud_water}</span></div>
+                <div class="data-row"><span class="label">Expected Cloud</span><span class="plain">${a.expected_cloud}</span></div>
+            </div>`;
+
+            // Soundings
+            const label = day.label || (i === 0 ? 'd1' : 'd2');
+            html += `<div class="card">
+                <div class="card-title"><i class="fa-solid fa-chart-line"></i> RASP Soundings</div>
+                <p style="font-size:12px;color:var(--color-text-muted);margin-bottom:8px;">Tap to zoom. See "Reading the RASP Sounding" below.</p>
+                <div class="soundings-grid">
+                    <div>
+                        <img class="sounding-img" src="${getSoundingUrl(label, '1100')}" alt="11:00 Sounding" onclick="openLightbox(this.src)" onerror="this.parentElement.style.display='none'">
+                        <div class="sounding-label">11:00 LST</div>
+                    </div>
+                    <div>
+                        <img class="sounding-img" src="${getSoundingUrl(label, '1400')}" alt="14:00 Sounding" onclick="openLightbox(this.src)" onerror="this.parentElement.style.display='none'">
+                        <div class="sounding-label">14:00 LST</div>
+                    </div>
+                </div>
+            </div>`;
+
+            html += '</div>';
+        });
+
+        document.getElementById('content').innerHTML = html;
+    }
+
+    function renderLegacyForecast(data) {
+        const days = [];
+        if (data.saturday) {
+            const d = new Date(data.saturday.date + 'T12:00:00');
+            days.push({ date: data.saturday.date, day_name: d.toLocaleDateString('en-ZA', {weekday:'long'}), label: 'd1', assessment: data.saturday.assessment });
+        }
+        if (data.sunday) {
+            const d = new Date(data.sunday.date + 'T12:00:00');
+            days.push({ date: data.sunday.date, day_name: d.toLocaleDateString('en-ZA', {weekday:'long'}), label: 'd2', assessment: data.sunday.assessment });
+        }
+        renderForecast({ generated_at: data.generated_at, days });
+    }
+
+    function renderVerdictRow(factor, item) {
+        if (!item) return '';
+        return `<tr>
+            <td class="factor">${factor}</td>
+            <td><span class="rating rating-${item.rating}">${item.rating}</span> <span class="detail">${item.detail}</span></td>
+        </tr>`;
+    }
+
+    function switchDay(idx) {
+        document.querySelectorAll('.day-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+        document.querySelectorAll('.day-content').forEach((c, i) => c.style.display = i === idx ? '' : 'none');
+    }
+
+    function openLightbox(src) {
+        document.getElementById('lightbox-img').src = src;
+        document.getElementById('lightbox').classList.add('open');
+    }
+
+    // === PWA INSTALL ===
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (!localStorage.getItem('install-dismissed')) {
+            document.getElementById('install-banner').classList.add('show');
+        }
+    });
+
+    function installApp() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(() => {
+                document.getElementById('install-banner').classList.remove('show');
+                deferredPrompt = null;
+            });
+        }
+    }
+
+    function dismissInstall() {
+        document.getElementById('install-banner').classList.remove('show');
+        localStorage.setItem('install-dismissed', '1');
+    }
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+
+    // Load forecast + auto-refresh
+    loadForecast();
+    setInterval(loadForecast, 30 * 60 * 1000);
+    </script>
+</body>
+</html>
