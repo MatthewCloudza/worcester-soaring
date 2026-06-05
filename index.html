@@ -588,9 +588,19 @@
                 window.FORECAST_DATA = null;
                 const script = document.createElement('script');
                 script.id = 'forecast-script';
+                // Try local first, fallback to Google Drive (for GitHub Pages where local won't exist)
+                const driveUrl = `https://drive.google.com/uc?export=download&id=1pPs-ocAlc5-WgpYJX2zxUCKqAbxqu48B&_t=${Date.now()}`;
                 script.src = `forecast.js?_t=${Date.now()}`;
                 script.onload = resolve;
-                script.onerror = () => reject(new Error('Failed to load forecast data'));
+                script.onerror = () => {
+                    // Fallback to Google Drive (for deployed site)
+                    const remote = document.createElement('script');
+                    remote.id = 'forecast-script';
+                    remote.src = driveUrl;
+                    remote.onload = resolve;
+                    remote.onerror = () => reject(new Error('Failed to load forecast data'));
+                    document.head.appendChild(remote);
+                };
                 document.head.appendChild(script);
             });
 
